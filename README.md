@@ -23,8 +23,9 @@ Tahoe so far.
    or file timestamps). Shots before 4 AM count as the previous day, so a
    shoot that runs past midnight stays together. Name each session (optional,
    Enter accepts), merge groups, or ✕ a thumbnail to leave it behind.
-3. Pick a destination (remembered). Each session lands in
-   `{year}/{YYYY-MM-DD} {name}/`.
+3. Pick a destination (remembered). The folder layout is a pattern built from
+   `{year}` `{month}` `{day}` `{date}` `{name}`, with a live preview;
+   the default is `{year}/{date} {name}`.
 4. Every file is copied with an in-flight blake3 checksum, then read back from
    the destination and compared. Same name + size elsewhere → skipped as a
    duplicate; name clash → kept as `name (2).ext`.

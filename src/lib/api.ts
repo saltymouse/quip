@@ -73,9 +73,11 @@ export const scanCard = (path: string, boundaryHour: number) =>
 export const makeThumb = (path: string) => invoke<string>("make_thumb", { path });
 export const makePreview = (path: string) => invoke<string>("make_preview", { path });
 export const checkDestination = (path: string) => invoke<void>("check_destination", { path });
+export const renderPatternPreview = (pattern: string, date: string, name: string) =>
+  invoke<string>("render_pattern_preview", { pattern, date, name });
 export const importSessions = (plan: {
   destination: string;
-  year_subfolders: boolean;
+  folder_pattern: string;
   sessions: SessionPlan[];
 }) => invoke<ImportResult>("import_sessions", { plan });
 export const cancelImport = () => invoke<void>("cancel_import");

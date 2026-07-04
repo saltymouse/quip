@@ -57,7 +57,7 @@
       try {
         wiz.result = await importSessions({
           destination: wiz.settings.destination,
-          year_subfolders: wiz.settings.yearSubfolders,
+          folder_pattern: wiz.settings.folderPattern,
           sessions: wiz.sessions
             .filter((s) => s.included && s.items.some((i) => i.included))
             .map((s) => ({

@@ -10,7 +10,7 @@ static CANCELLED: AtomicBool = AtomicBool::new(false);
 #[derive(Deserialize, Debug)]
 pub struct ImportPlan {
     pub destination: String,
-    pub year_subfolders: bool,
+    pub folder_pattern: String,
     pub sessions: Vec<SessionPlan>,
 }
 
@@ -56,18 +56,75 @@ fn sanitize_name(name: &str) -> String {
         .to_string()
 }
 
-fn session_dir(plan: &ImportPlan, session: &SessionPlan) -> PathBuf {
-    let name = sanitize_name(&session.name);
-    let folder = if name.is_empty() {
-        session.date.clone()
-    } else {
-        format!("{} {}", session.date, name)
-    };
-    let mut dir = PathBuf::from(&plan.destination);
-    if plan.year_subfolders {
-        dir = dir.join(&session.date[..4]);
+pub const DEFAULT_PATTERN: &str = "{year}/{date} {name}";
+
+fn substitute(segment: &str, date: &str, name: &str) -> Result<String, String> {
+    let mut out = String::new();
+    let mut rest = segment;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let Some(len) = rest[start..].find('}') else {
+            return Err(format!("unclosed '{{' in \"{segment}\""));
+        };
+        let value = match &rest[start + 1..start + len] {
+            "year" => date.get(..4).unwrap_or_default(),
+            "month" => date.get(5..7).unwrap_or_default(),
+            "day" => date.get(8..10).unwrap_or_default(),
+            "date" => date,
+            "name" => name,
+            other => return Err(format!("unknown variable {{{other}}}")),
+        };
+        out.push_str(value);
+        rest = &rest[start + len + 1..];
     }
-    dir.join(folder)
+    out.push_str(rest);
+    Ok(out)
+}
+
+/// Render a folder pattern like "{year}/{date} {name}" into a relative path.
+/// Segments are trimmed and empty ones dropped, so an empty session name
+/// never leaves a trailing space or a blank folder level.
+pub fn render_pattern(pattern: &str, date: &str, name: &str) -> Result<PathBuf, String> {
+    let pattern = if pattern.trim().is_empty() {
+        DEFAULT_PATTERN
+    } else {
+        pattern
+    };
+    let clean_name = sanitize_name(name);
+    let mut path = PathBuf::new();
+    for segment in pattern.split('/') {
+        let rendered = substitute(segment, date, &clean_name)?;
+        let rendered = rendered.trim();
+        if rendered.is_empty() {
+            continue;
+        }
+        if rendered == "." || rendered == ".." {
+            return Err("pattern segments may not be '.' or '..'".into());
+        }
+        path.push(rendered);
+    }
+    if path.as_os_str().is_empty() {
+        return Err("pattern produced an empty path".into());
+    }
+    Ok(path)
+}
+
+/// Pure preview for the UI — must stay the exact code path used by imports.
+#[tauri::command]
+pub fn render_pattern_preview(
+    pattern: String,
+    date: String,
+    name: String,
+) -> Result<String, String> {
+    render_pattern(&pattern, &date, &name).map(|p| p.to_string_lossy().into_owned())
+}
+
+fn session_dir(plan: &ImportPlan, session: &SessionPlan) -> Result<PathBuf, String> {
+    Ok(PathBuf::from(&plan.destination).join(render_pattern(
+        &plan.folder_pattern,
+        &session.date,
+        &session.name,
+    )?))
 }
 
 #[tauri::command]
@@ -188,7 +245,7 @@ pub fn run_import<R: Runtime>(app: &AppHandle<R>, plan: ImportPlan) -> Result<Im
     let mut cancelled = false;
 
     'sessions: for session in &plan.sessions {
-        let dir = session_dir(&plan, session);
+        let dir = session_dir(&plan, session)?;
         fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
         session_dirs.push(dir.to_string_lossy().into_owned());
 
@@ -414,37 +471,59 @@ pub fn reveal(path: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    fn plan(year_subfolders: bool) -> ImportPlan {
-        ImportPlan {
-            destination: "/archive".into(),
-            year_subfolders,
-            sessions: vec![],
-        }
-    }
-
     #[test]
-    fn session_dir_with_name_and_year() {
-        let s = SessionPlan {
-            date: "2026-05-29".into(),
-            name: "奥津宮神社".into(),
-            files: vec![],
-        };
+    fn default_pattern_with_name_and_year() {
         assert_eq!(
-            session_dir(&plan(true), &s),
-            PathBuf::from("/archive/2026/2026-05-29 奥津宮神社")
+            render_pattern(DEFAULT_PATTERN, "2026-05-29", "奥津宮神社").unwrap(),
+            PathBuf::from("2026/2026-05-29 奥津宮神社")
         );
     }
 
     #[test]
-    fn session_dir_empty_name_is_just_date() {
-        let s = SessionPlan {
-            date: "2026-05-29".into(),
-            name: "  ".into(),
-            files: vec![],
-        };
+    fn empty_name_leaves_no_trailing_space() {
         assert_eq!(
-            session_dir(&plan(false), &s),
-            PathBuf::from("/archive/2026-05-29")
+            render_pattern("{date} {name}", "2026-05-29", "  ").unwrap(),
+            PathBuf::from("2026-05-29")
+        );
+    }
+
+    #[test]
+    fn name_only_segment_vanishes_when_empty() {
+        assert_eq!(
+            render_pattern("{year}/{name}/{date}", "2026-05-29", "").unwrap(),
+            PathBuf::from("2026/2026-05-29")
+        );
+    }
+
+    #[test]
+    fn nested_month_pattern() {
+        assert_eq!(
+            render_pattern("{year}/{month}/{date} {name}", "2026-05-29", "旅").unwrap(),
+            PathBuf::from("2026/05/2026-05-29 旅")
+        );
+    }
+
+    #[test]
+    fn unknown_variable_is_rejected() {
+        let err = render_pattern("{year}/{foo}", "2026-05-29", "").unwrap_err();
+        assert!(err.contains("{foo}"), "{err}");
+    }
+
+    #[test]
+    fn unclosed_brace_is_rejected() {
+        assert!(render_pattern("{year", "2026-05-29", "").is_err());
+    }
+
+    #[test]
+    fn dotdot_segment_is_rejected() {
+        assert!(render_pattern("../{date}", "2026-05-29", "").is_err());
+    }
+
+    #[test]
+    fn blank_pattern_falls_back_to_default() {
+        assert_eq!(
+            render_pattern("  ", "2026-05-29", "x").unwrap(),
+            PathBuf::from("2026/2026-05-29 x")
         );
     }
 

@@ -20,6 +20,7 @@ pub fn run() {
             thumbs::make_thumb,
             thumbs::make_preview,
             import::check_destination,
+            import::render_pattern_preview,
             import::import_sessions,
             import::cancel_import,
             import::delete_from_card,

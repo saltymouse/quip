@@ -40,7 +40,7 @@ fn import_verify_reimport_and_cleanup() {
     let app = tauri::test::mock_app();
     let plan = |files: Vec<String>| ImportPlan {
         destination: dest.path().display().to_string(),
-        year_subfolders: true,
+        folder_pattern: "{year}/{month}/{date} {name}".into(),
         sessions: vec![SessionPlan {
             date: "2026-05-29".into(),
             name: "テスト/セッション".into(), // slash must be sanitized
@@ -56,7 +56,7 @@ fn import_verify_reimport_and_cleanup() {
 
     let session_dir = dest
         .path()
-        .join("2026/2026-05-29 テスト-セッション");
+        .join("2026/05/2026-05-29 テスト-セッション");
     assert!(session_dir.join("DSC00001.JPG").is_file());
     assert!(session_dir.join("DSC00001.ARW").is_file());
     assert!(session_dir.join("C0001.MP4").is_file());
@@ -97,7 +97,7 @@ fn missing_destination_fails_preflight() {
         app.handle(),
         ImportPlan {
             destination: "/nonexistent/nfs/share".into(),
-            year_subfolders: true,
+            folder_pattern: String::new(),
             sessions: vec![SessionPlan {
                 date: "2026-05-29".into(),
                 name: String::new(),

@@ -1,12 +1,15 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
-  import { checkDestination, formatBytes } from "$lib/api";
+  import { checkDestination, renderPatternPreview, formatBytes } from "$lib/api";
   import { wiz, saveSettings, sessionStats, includedFiles } from "$lib/wizard.svelte";
   import { t } from "$lib/i18n.svelte";
+  import PatternInput from "./PatternInput.svelte";
 
   let destination = $state(wiz.settings.destination);
   let checking = $state(false);
   let input = $state<HTMLInputElement | null>(null);
+  let previews = $state<Map<string, string>>(new Map());
+  let patternError = $state<string | null>(null);
 
   $effect(() => {
     input?.focus();
@@ -17,15 +20,24 @@
     wiz.sessions.filter((s) => s.included && s.items.some((i) => i.included))
   );
 
-  function folderName(date: string, name: string): string {
-    const clean = name.trim().replace(/[/:]/g, "-");
-    return clean ? `${date} ${clean}` : date;
-  }
-
-  function fullPath(date: string, name: string): string {
-    const year = wiz.settings.yearSubfolders ? `${date.slice(0, 4)}/` : "";
-    return `${destination.replace(/\/$/, "")}/${year}${folderName(date, name)}/`;
-  }
+  // Preview comes from the same Rust renderer that builds the real paths.
+  $effect(() => {
+    const pattern = wiz.settings.folderPattern;
+    const dest = destination.replace(/\/$/, "");
+    const sessions = included.map((s) => ({ date: s.date, name: s.name }));
+    (async () => {
+      try {
+        const rendered = await Promise.all(
+          sessions.map((s) => renderPatternPreview(pattern, s.date, s.name))
+        );
+        patternError = null;
+        previews = new Map(rendered.map((p, i) => [sessions[i].date, `${dest}/${p}/`]));
+      } catch (e) {
+        patternError = String(e);
+        previews = new Map();
+      }
+    })();
+  });
 
   async function browse() {
     const dir = await open({ directory: true, defaultPath: destination });
@@ -64,21 +76,32 @@
     </div>
   </label>
 
+  <div class="pattern-row">
+    <PatternInput error={patternError} />
+  </div>
+
   <ul class="preview">
     {#each destination.trim() ? included : [] as session (session.date)}
       {@const stats = sessionStats(session)}
-      <li>
-        <code>{fullPath(session.date, session.name)}</code>
-        <span class="stats">
-          {t("files_count", { n: includedFiles(session).length })} · {formatBytes(stats.bytes)}
-        </span>
-      </li>
+      {@const path = previews.get(session.date)}
+      {#if path}
+        <li>
+          <code>{path}</code>
+          <span class="stats">
+            {t("files_count", { n: includedFiles(session).length })} · {formatBytes(stats.bytes)}
+          </span>
+        </li>
+      {/if}
     {/each}
   </ul>
 
   <footer>
     <button class="ghost" onclick={() => (wiz.step = "sessions")}>{t("back")}</button>
-    <button class="primary" disabled={checking || !destination.trim()} onclick={proceed}>
+    <button
+      class="primary"
+      disabled={checking || !destination.trim() || patternError !== null}
+      onclick={proceed}
+    >
       {checking ? t("checking") : t("start_import")}
     </button>
   </footer>
@@ -98,6 +121,9 @@
   .row input {
     flex: 1;
     font-size: 1rem;
+  }
+  .pattern-row {
+    margin-top: 1rem;
   }
   .preview {
     list-style: none;

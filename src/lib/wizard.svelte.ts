@@ -18,14 +18,16 @@ export interface UiSession {
 export interface Settings {
   destination: string;
   boundaryHour: number;
-  yearSubfolders: boolean;
+  folderPattern: string;
   language: "system" | "en" | "ja";
 }
+
+export const DEFAULT_PATTERN = "{year}/{date} {name}";
 
 const DEFAULTS: Settings = {
   destination: "",
   boundaryHour: 4,
-  yearSubfolders: true,
+  folderPattern: DEFAULT_PATTERN,
   language: "system",
 };
 
@@ -45,8 +47,15 @@ let store: Store | null = null;
 
 export async function loadSettings() {
   store = await load("settings.json", { autoSave: true, defaults: {} });
-  const saved = await store.get<Settings>("settings");
-  if (saved) wiz.settings = { ...DEFAULTS, ...saved };
+  const saved = await store.get<Settings & { yearSubfolders?: boolean }>("settings");
+  if (saved) {
+    wiz.settings = { ...DEFAULTS, ...saved };
+    // Settings written before folder patterns existed had a yearSubfolders flag.
+    if (!saved.folderPattern) {
+      wiz.settings.folderPattern =
+        saved.yearSubfolders === false ? "{date} {name}" : DEFAULT_PATTERN;
+    }
+  }
 }
 
 export async function saveSettings() {

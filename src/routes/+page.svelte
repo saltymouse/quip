@@ -9,6 +9,7 @@
   import DestinationStep from "$lib/components/DestinationStep.svelte";
   import ImportStep from "$lib/components/ImportStep.svelte";
   import DoneStep from "$lib/components/DoneStep.svelte";
+  import PatternInput from "$lib/components/PatternInput.svelte";
 
   const steps: { id: typeof wiz.step; label: MsgKey }[] = [
     { id: "source", label: "step_card" },
@@ -80,14 +81,7 @@
           onchange={saveSettings}
         />
       </label>
-      <label class="row">
-        <input
-          type="checkbox"
-          bind:checked={wiz.settings.yearSubfolders}
-          onchange={saveSettings}
-        />
-        {t("year_folders")}
-      </label>
+      <PatternInput />
       <label>
         {t("language")}
         <select bind:value={wiz.settings.language} onchange={saveSettings}>
@@ -230,12 +224,6 @@
     gap: 0.3rem;
     font-size: 0.85rem;
     color: var(--dim);
-  }
-  .settings label.row {
-    grid-auto-flow: column;
-    justify-content: start;
-    align-items: center;
-    gap: 0.5rem;
   }
   .error {
     background: #3a2230;
