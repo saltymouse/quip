@@ -1,0 +1,53 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#27313f"/>
+      <stop offset="1" stop-color="#11151c"/>
+    </linearGradient>
+    <linearGradient id="sail1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b7cfff"/>
+      <stop offset="1" stop-color="#5f97f7"/>
+    </linearGradient>
+    <linearGradient id="sail2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7fb0ff"/>
+      <stop offset="1" stop-color="#4577d4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="32" y="32" width="960" height="960" rx="212" fill="url(#bg)"/>
+
+  <!-- moon -->
+  <circle cx="806" cy="224" r="42" fill="#e6e9ef" opacity="0.85"/>
+
+  <!-- front sail: one continuous opening-quote / comma shape -->
+  <path fill="url(#sail1)" d="
+    M 575 245
+    C 560 340 548 430 522 508
+    C 505 615 400 668 315 625
+    C 238 585 232 468 298 418
+    C 340 386 400 380 445 408
+    C 458 340 515 285 575 245 Z"/>
+
+  <!-- back sail: same shape, scaled and shifted right -->
+  <path fill="url(#sail2)" transform="translate(360,189) scale(0.72)" d="
+    M 575 245
+    C 560 340 548 430 522 508
+    C 505 615 400 668 315 625
+    C 238 585 232 468 298 418
+    C 340 386 400 380 445 408
+    C 458 340 515 285 575 245 Z"/>
+
+  <!-- hull -->
+  <path d="M 236 682
+           Q 520 702 804 682
+           L 738 784
+           Q 518 834 300 784 Z"
+        fill="#f0b35e"/>
+
+  <!-- waves -->
+  <path d="M 200 856 Q 260 836 320 856 T 440 856 T 560 856 T 680 856 T 800 856"
+        fill="none" stroke="#6aa1ff" stroke-width="18" stroke-linecap="round" opacity="0.4"/>
+  <path d="M 280 916 Q 340 896 400 916 T 520 916 T 640 916 T 760 916"
+        fill="none" stroke="#6aa1ff" stroke-width="18" stroke-linecap="round" opacity="0.22"/>
+</svg>
